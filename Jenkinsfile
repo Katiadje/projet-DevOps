@@ -1,10 +1,11 @@
 pipeline {
     agent any
+
     environment {
-        IMAGE_NAME = 'myapp-image'
-        CONTAINER_NAME = 'myapp'
-        PORT = '8088'
+        IMG_NAME = 'nginx'
+        DOCKER_REPO = 'test'
     }
+
     stages {
         stage('Clean Workspace') {
             steps {
@@ -14,48 +15,36 @@ pipeline {
 
         stage('Checkout SCM') {
             steps {
-                git credentialsId: '61767618-7fdb-4d53-a45e-468d27e292fa', url: 'https://github.com/Katiadje/projet-DevOps'
-            }
-        }
-
-        stage('Clean Docker') {
-            steps {
-                script {
-                    sh """
-                        docker stop \$CONTAINER_NAME || true
-                        docker rm \$CONTAINER_NAME || true
-                        docker rmi -f \$IMAGE_NAME || true
-                        docker system prune -f || true
-                    """
-                }
+                git (
+                    branch: 'main',
+                    url: 'https://github.com/Katiadje/projet-DevOps.git'
+                )
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    echo "Création du Dockerfile et construction de l'image..."
-                    sh """
-                        docker build -t \$IMAGE_NAME .
-                    """
+                    sh "docker build -t ${IMG_NAME} ."
+                    sh "docker tag ${IMG_NAME} ${DOCKER_REPO}:${IMG_NAME}"
                 }
             }
         }
 
-        stage('Run Container') {
+        stage('Deploy Container') {
             steps {
                 script {
-                    echo "Lancement du conteneur..."
                     sh """
-                        docker run -d --name \$CONTAINER_NAME -p \$PORT:80 \$IMAGE_NAME || {
-                            echo 'Erreur lors de l'exécution de docker run'
-                            exit 1
-                        }
+                        docker stop monapp || true
+                        docker rm monapp || true
+                        docker run -d --name monapp --hostname monapp -p 8585:80 ${IMG_NAME}
+                        docker exec monapp ifconfig
                     """
                 }
             }
         }
     }
+
     post {
         always {
             echo 'Pipeline terminé.'
